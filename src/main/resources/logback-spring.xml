@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+    <springProperty name="springAppName" source="spring.application.name" defaultValue="elk-def"/>
+
+        <appender name="RollingFile"
+                   class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>/tmp/spring-boot-logger.log</file>
+        <encoder>
+            <Pattern>${CONSOLE_LOG_PATTERN}</Pattern>
+        </encoder>
+
+        <rollingPolicy
+                class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>/tmp/archived/spring-boot-logger-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <totalSizeCap>1GB</totalSizeCap>
+            <maxHistory>10</maxHistory>
+            <maxFileSize>50MB</maxFileSize>
+        </rollingPolicy>
+        </appender>
+        <appender name="logstash"
+                  class="net.logstash.logback.appender.LogstashTcpSocketAppender">
+            <destination>localhost:4560</destination>
+            <encoder charset="UTF-8" class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+                <providers>
+                    <timestamp>
+                        <timeZone>SGT</timeZone>
+                    </timestamp>
+                    <pattern>
+                        <pattern>
+                            {
+                            "severity":"%level",
+                            "service": "${springAppName:-}",
+                            "trace": "%X{X-B3-TraceId:-}",
+                            "span": "%X{X-B3-SpanId:-}",
+                            "exportable": "%X{X-Span-Export:-}",
+                            "pid": "${PID:-}",
+                            "thread": "%thread",
+                            "class": "%logger{40}",
+                            "rest": "%message"
+                            }
+                        </pattern>
+                    </pattern>
+                </providers>
+            </encoder>
+        </appender>
+        <appender name="async-logstash" class="ch.qos.logback.classic.AsyncAppender">
+            <discardingThreshold>0</discardingThreshold>
+            <queueSize>256</queueSize>
+            <appender-ref ref="logstash"/>
+        </appender>
+
+        <root level="info">
+            <appender-ref ref="CONSOLE" />
+            <appender-ref ref="RollingFile" />
+            <appender-ref ref="async-logstash"/>
+        </root>
+        <logger name="com.yj" additivity="false" level="debug">
+            <appender-ref ref="CONSOLE" />
+            <appender-ref ref="RollingFile" />
+            <appender-ref ref="async-logstash"/>
+        </logger>
+
+</configuration>
